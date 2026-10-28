@@ -7,6 +7,15 @@ BAR1 aperture, with no system-RAM staging in the data path. For modded cards
 **No ReBAR resizing, no firmware flashing, no proprietary blobs** — patches
 and scripts only.
 
+Consumer cards normally cannot address each other's memory: peer access is
+disabled and BAR1 is much smaller than the framebuffer, so collectives go
+through system RAM. barlink-pcie exposes a direct path inside that existing
+BAR1 aperture — a dma-buf on the target card, attached by a small holder
+module, which the source card writes into over PCIe. Measured at the
+collective level against NCCL: gains from roughly 80 KiB message size
+upward, a small loss below the direct path's minimum transfer size —
+figures and conditions in [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
+
 All credit for the mechanism goes upstream: barlink-pcie by **efschu**. This
 repository adds the port to 615.78.08, the platform fixes, and the
 card-aware installer.
@@ -59,25 +68,9 @@ sudo bash scripts/revert.sh
 
 A reboot also returns to the stock driver.
 
-## modded-p2p
-
-Consumer cards normally cannot address each other's memory: peer access is
-disabled and BAR1 is much smaller than the framebuffer, so collectives go
-through system RAM. barlink-pcie exposes a direct path inside that existing
-BAR1 aperture — a dma-buf on the target card, attached by a small holder
-module, which the source card writes into over PCIe. BAR1 is not resized and
-the firmware is not touched.
-
-Measured at the collective level against NCCL: gains from roughly 80 KiB
-message size upward, a small loss below the direct path's minimum transfer
-size. Figures and conditions: [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
-
-Requirements, the pinned driver tag, the load keys and the recovery steps:
-[docs/DETAILS.md](docs/DETAILS.md).
-
 ## Docs
 
-- [docs/DETAILS.md](docs/DETAILS.md) — modded-p2p mechanism, patch ports, troubleshooting, FAQ
+- [docs/DETAILS.md](docs/DETAILS.md) — mechanism, patch ports, troubleshooting, FAQ
 - [docs/PERFORMANCE.md](docs/PERFORMANCE.md) — measurements, conditions
 - [LICENSE-NOTES.md](LICENSE-NOTES.md) — licenses
 
