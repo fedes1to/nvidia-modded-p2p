@@ -20,11 +20,11 @@ and the card-aware installer.
 
 ## Also recommended: gpu-unlock
 
-If you have GA102/GA104 cards, pair this with
-[Zagitta/gpu-unlock](https://github.com/Zagitta/gpu-unlock). It lifts the
-consumer compute caps on those chips. It never writes the vBIOS and
-doesn't touch clocks, memory, or the P2P path. It is maintained in its own
-repository and updated regularly — install it directly from there.
+Pair this with [Zagitta/gpu-unlock](https://github.com/Zagitta/gpu-unlock):
+it works on all moddable cards and lifts their consumer compute caps. It
+never writes the vBIOS and doesn't touch clocks, memory, or the P2P path.
+It is maintained in its own repository and updated regularly — install it
+directly from there.
 
 ## What you need
 

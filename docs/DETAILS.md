@@ -17,15 +17,15 @@ collective level against NCCL: gains from roughly 80 KiB message size
 upward, a small loss below the direct path's minimum transfer size;
 figures and conditions in [PERFORMANCE.md](PERFORMANCE.md).
 
-## Pairing with gpu-unlock (GA102/GA104)
+## Pairing with gpu-unlock
 
-If you have GA102/GA104 cards,
-[Zagitta/gpu-unlock](https://github.com/Zagitta/gpu-unlock) runs from the
-initramfs before the driver binds and lifts the consumer SM issue-rate caps
-(`SS0`/`SS1`) — the CMP cap on tensor and arithmetic throughput. It does
-not touch clocks, memory bandwidth, BAR1 or the P2P path, and it never
-writes the vBIOS. It is maintained in its own repository and updated
-regularly, so install it directly from there.
+[Zagitta/gpu-unlock](https://github.com/Zagitta/gpu-unlock) works on all
+moddable cards. It runs from the initramfs before the driver binds and
+lifts the consumer SM issue-rate caps (`SS0`/`SS1`) — the CMP cap on
+tensor and arithmetic throughput. It does not touch clocks, memory
+bandwidth, BAR1 or the P2P path, and it never writes the vBIOS. It is
+maintained in its own repository and updated regularly, so install it
+directly from there.
 
 ## Full requirements
 
