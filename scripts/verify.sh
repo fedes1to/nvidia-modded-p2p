@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# nvidia-gpu-patches verification:
+# nvidia-modded-p2p verification:
 #   1. is the patched module the one that is loaded?
 #   2. host requirements (barlink preflight, if the venv was installed)
 #   3. byte-level proof: GPU->GPU write into the peer's BAR1, read back through
@@ -10,7 +10,7 @@ set -euo pipefail
 
 [ "$(id -u)" = 0 ] || { echo "run as root: sudo bash $0" >&2; exit 1; }
 
-BASE="${BARLINK_BASE:-/opt/nvidia-gpu-patches}"
+BASE="${BARLINK_BASE:-/opt/nvidia-modded-p2p}"
 # shellcheck disable=SC1091
 . "$BASE/env" 2>/dev/null || { echo "not installed: $BASE/env missing -- run scripts/install.sh" >&2; exit 1; }
 CUDA_HOME="${CUDA_HOME:-/opt/cuda}"
@@ -43,7 +43,7 @@ fi
 
 step "byte-level proof (both directions)"
 command -v g++ >/dev/null || { fail "g++ missing"; exit "$RC"; }
-PROBE=/tmp/nvidia-gpu-patches-probe
+PROBE=/tmp/nvidia-modded-p2p-probe
 g++ -O2 -std=c++14 \
   -I"$BARLINK_DIR" \
   -I"$DRIVER_DIR/kernel-open/common/inc" \

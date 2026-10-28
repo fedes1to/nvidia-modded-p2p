@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Undo nvidia-gpu-patches completely: remove the persistent override and all config,
+# Undo nvidia-modded-p2p completely: remove the persistent override and all config,
 # return to the stock driver. Works with systemd, OpenRC and dinit.
 # Safe to run from a TTY if a boot went wrong.
 #
@@ -11,7 +11,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
 
-BASE="${BARLINK_BASE:-/opt/nvidia-gpu-patches}"
+BASE="${BARLINK_BASE:-/opt/nvidia-modded-p2p}"
 KVER="$(uname -r)"
 OVR="/lib/modules/$KVER/updates/barlink-p2p"
 
@@ -71,12 +71,6 @@ rm -f /etc/modprobe.d/barlink-p2p.conf \
 [ -f /etc/modules ] && sed -i '/^dmabuf_holder$/d' /etc/modules 2>/dev/null || true
 depmod -a "$KVER"
 
-if [ -x "$ROOT/scripts/revert-gpu-unlock.sh" ] &&
-   { [ -e /usr/lib/firmware/gpu-unlock ] || compgen -G "/lib/modules/*/updates/gpu-unlock" >/dev/null; }; then
-  step "removing the optional gpu-unlock component"
-  "$ROOT/scripts/revert-gpu-unlock.sh" || warn "gpu-unlock cleanup reported a problem"
-fi
-
 step "restoring the stock driver"
 RESOLVED="$(modinfo -n nvidia 2>/dev/null || true)"
 echo "nvidia resolves to: $RESOLVED"
@@ -100,6 +94,6 @@ for s in $stopped; do
 done
 
 step "done"
-echo "nvidia-gpu-patches removed. Reboot for a completely clean state."
+echo "nvidia-modded-p2p removed. Reboot for a completely clean state."
 echo "The build tree at $BASE was left in place; delete it manually if you want:"
 echo "  rm -rf $BASE"

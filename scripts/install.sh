@@ -1,24 +1,12 @@
 #!/usr/bin/env bash
-# nvidia-gpu-patches installer -- one command, persists across reboots.
+# nvidia-modded-p2p installer -- one command, persists across reboots.
 #
 #   sudo bash scripts/install.sh                 # detect the cards, then install
 #   sudo bash scripts/install.sh --with-torch    # ... plus the optional Python checks
-#   sudo bash scripts/install.sh --with-gpu-unlock  # force the optional GA102/GA104 unlock
-#   sudo bash scripts/install.sh --no-gpu-unlock    # never install the unlock
 #   sudo bash scripts/install.sh --with-modded-p2p  # force the barlink driver install
 #   sudo bash scripts/install.sh --no-modded-p2p    # never install the barlink driver
-#   sudo bash scripts/install.sh --no-custom-allreduce  # don't offer the vLLM patch
 #   sudo bash scripts/install.sh --yes           # accept the interactive prompts
 #   sudo bash scripts/install.sh --no-activate   # install for the next boot only
-#
-# Card-driven components:
-#   gpu-unlock        auto on GA102/GA104 cards (compute unlock)
-#   modded-p2p        on modded cards (2080 Ti 22 GB, 3080 20 GB, 4080 32 GB,
-#                     4090 48 GB), and on uneven rigs after confirmation;
-#                     skipped on uniform stock rigs unless --with-modded-p2p
-#   custom all-reduce on an even GPU count (2/4/6/8) the installer offers to
-#                     apply patches/vllm-custom-allreduce-p2p-<ver>.patch
-#                     to the vLLM venv (scripts/patch-venvs.sh does it alone)
 #
 # What it does:
 #   1. builds NVIDIA's open kernel modules at the pinned tag with the barlink
@@ -28,8 +16,11 @@
 #      packaged module, so every boot from now on loads the patched one)
 #   3. writes the load keys and runtime environment
 #   4. swaps the running driver now (screen freezes for a few seconds)
-#   5. installs Zagitta/gpu-unlock when a GA102/GA104 card is present (or when
-#      forced); on other cards it is skipped unless --with-gpu-unlock is given
+#
+# It targets modded cards (2080 Ti 22 GB, 3080 20 GB, 4080 32 GB, 4090 48 GB)
+# and, after a confirmation prompt, uneven rigs (mixed models or memory).
+# A uniform stock rig is left on the stock driver; force the install with
+# --with-modded-p2p.
 #
 # Undo everything with:  sudo bash scripts/revert.sh
 set -euo pipefail
@@ -40,15 +31,13 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
 
 DRIVER_TAG="${BARLINK_DRIVER_TAG:-615.78.08}"
-BASE="${BARLINK_BASE:-/opt/nvidia-gpu-patches}"
+BASE="${BARLINK_BASE:-/opt/nvidia-modded-p2p}"
 BUILD="$BASE/build"
 KVER="$(uname -r)"
 KDIR="/lib/modules/$KVER/build"
 OVR="/lib/modules/$KVER/updates/barlink-p2p"
 WITH_TORCH=0
-WITH_GPU_UNLOCK=auto
 WITH_MODDED_P2P=auto
-CUSTOM_ALLREDUCE=ask
 ASSUME_YES=0
 ACTIVATE=1
 UPSTREAM_DRIVER="https://github.com/NVIDIA/open-gpu-kernel-modules"
@@ -57,11 +46,8 @@ UPSTREAM_BARLINK="https://github.com/efschu/barlink-pcie"
 for arg in "$@"; do
   case "$arg" in
     --with-torch)       WITH_TORCH=1 ;;
-    --with-gpu-unlock)  WITH_GPU_UNLOCK=1 ;;
-    --no-gpu-unlock)    WITH_GPU_UNLOCK=0 ;;
     --with-modded-p2p)  WITH_MODDED_P2P=1 ;;
     --no-modded-p2p)    WITH_MODDED_P2P=0 ;;
-    --no-custom-allreduce) CUSTOM_ALLREDUCE=0 ;;
     --yes|-y)           ASSUME_YES=1 ;;
     --no-activate)      ACTIVATE=0 ;;
     --driver-tag=*)     DRIVER_TAG="${arg#*=}" ;;
@@ -139,24 +125,6 @@ if [ "${#GPU_SIGS[@]}" -gt 1 ]; then UNEVEN=1; fi
 # ---------------------------------------------------------------------------
 # component selection
 # ---------------------------------------------------------------------------
-# gpu-unlock is for GA102/GA104 only. Enable it when such a card is present;
-# other cards need an explicit --with-gpu-unlock. --check only reads the
-# pinned PCI ID list from the upstream source.
-if [ "$WITH_GPU_UNLOCK" = auto ]; then
-  if bash "$ROOT/scripts/install-gpu-unlock.sh" --check >/dev/null 2>&1; then
-    WITH_GPU_UNLOCK=1
-    echo "GA102/GA104 card detected: gpu-unlock will be installed"
-  else
-    rc=$?
-    WITH_GPU_UNLOCK=0
-    if [ "$rc" = 3 ]; then
-      echo "no GA102/GA104 card: gpu-unlock skipped (force with --with-gpu-unlock)"
-    else
-      warn "gpu-unlock precheck failed (rc=$rc); skipped (force with --with-gpu-unlock)"
-    fi
-  fi
-fi
-
 # modded-p2p (barlink) targets modded cards and, after confirmation, uneven
 # rigs. A uniform stock rig is left on the stock driver unless forced.
 if [ "$WITH_MODDED_P2P" = auto ]; then
@@ -252,7 +220,7 @@ RESOLVED="$(modinfo -n nvidia 2>/dev/null || true)"
 
 step "load keys + runtime environment"
 cat > /etc/modprobe.d/barlink-p2p.conf <<'EOF'
-# nvidia-gpu-patches: keys consumed by the patched module. Unknown keys are
+# nvidia-modded-p2p: keys consumed by the patched module. Unknown keys are
 # ignored by the stock module, so a kernel update cannot make the machine
 # unbootable.
 options nvidia NVreg_RegistryDwords="BarlinkPeerBar1=1;RMPcieP2PType=1"
@@ -301,7 +269,7 @@ echo "$HOLD_BDF" > /etc/barlink-p2p.hold-bdf
 echo "attach device: ${HOLD_BDF:-<none found>}"
 
 cat > /etc/profile.d/barlink-p2p.sh <<EOF
-# nvidia-gpu-patches runtime environment (barlink-pcie direct path)
+# nvidia-modded-p2p runtime environment (barlink-pcie direct path)
 export BARLINK_BUILD_DIR="$BUILD"
 export BARLINK_BAR1_NV_SOURCE="$BUILD/driver-$DRIVER_TAG"
 export BARLINK_NVIDIA_KO="$BUILD/driver-$DRIVER_TAG/kernel-open/nvidia.ko"
@@ -398,31 +366,6 @@ else
   echo "skipped: not a modded or confirmed uneven rig (force with --with-modded-p2p)"
 fi
 
-if [ "$WITH_GPU_UNLOCK" = 1 ]; then
-  step "gpu-unlock (optional GA102/GA104 pre-driver unlock)"
-  if bash "$ROOT/scripts/install-gpu-unlock.sh" ${GPU_UNLOCK_ARGS:-}; then
-    GPU_UNLOCK_INSTALLED=1
-  else
-    warn "gpu-unlock installation failed; the rest of the installation is unaffected"
-  fi
-fi
-
-# ---------------------------------------------------------------------------
-# vLLM custom all-reduce (even GPU count: the sizes vLLM's kernel supports)
-# ---------------------------------------------------------------------------
-if [ "$CUSTOM_ALLREDUCE" = ask ] && [ "$WITH_MODDED_P2P" = 1 ] \
-   && [ "$GPU_COUNT" -ge 2 ] && [ $((GPU_COUNT % 2)) -eq 0 ]; then
-  step "vLLM custom all-reduce"
-  echo "  $GPU_COUNT GPUs (even): vLLM gates its P2P custom all-reduce off on"
-  echo "  >2 PCIe-only GPUs. 2-GPU groups already use the two-GPU path; 4/6/8"
-  echo "  gain the full-mesh path from patches/vllm-custom-allreduce-p2p-*.patch."
-  if confirm "apply it to the vLLM venv now?"; then
-    bash "$ROOT/scripts/patch-venvs.sh" --vllm-only || warn "venv patch failed; run scripts/patch-venvs.sh by hand"
-  else
-    echo "  skipped; apply later with: sudo bash $ROOT/scripts/patch-venvs.sh --vllm-only"
-  fi
-fi
-
 if [ "$WITH_MODDED_P2P" = 1 ]; then
   step "installed"
   cat <<EOF
@@ -438,24 +381,3 @@ else
   step "installed (modded-p2p skipped)"
   echo "  The barlink driver was not installed. Re-run with --with-modded-p2p to install it."
 fi
-if [ "${GPU_UNLOCK_INSTALLED:-0}" = 1 ]; then
-  cat <<'EOF'
-gpu-unlock: installed; it runs from the next boot (cold boot is upstream's
-supported path; kernels >= 6.16 also worked after a warm reboot here).
-  check: dmesg | grep gpu_unlock   (or journalctl -k -b with journald)
-EOF
-fi
-
-# ---------------------------------------------------------------------------
-# framework venvs (vLLM / sglang)
-# ---------------------------------------------------------------------------
-cat <<EOF
-For the vLLM and sglang integrations to use the direct path, both venvs must
-be patched. One command does it (auto-detects ~/venv-vllm and ~/venv-sglang):
-  sudo bash $ROOT/scripts/patch-venvs.sh
-  sudo bash $ROOT/scripts/patch-venvs.sh VLLM_VENV SGLANG_VENV
-It applies this repo's barlink patches (platform fixes, inference-mode,
-capture gate, baton-marker state; docs/DETAILS.md) to the barlink-pcie each
-venv imports, and the vLLM custom all-reduce patch on a box with an even
-GPU count.
-EOF
