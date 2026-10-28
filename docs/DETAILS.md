@@ -6,6 +6,39 @@ authoritative design documents live upstream in
 `design/bar-pcie-mechanism.md`, `docs/BUILDING_THE_DRIVER.md`,
 `docs/OPERATIONS.md`, `docs/measurements/*`.
 
+## How it works
+
+Consumer cards normally cannot address each other's memory: peer access is
+disabled and BAR1 is much smaller than the framebuffer, so collectives go
+through system RAM. barlink-pcie exposes a direct path inside that existing
+BAR1 aperture — a dma-buf on the target card, attached by a small holder
+module, which the source card writes into over PCIe. Measured at the
+collective level against NCCL: gains from roughly 80 KiB message size
+upward, a small loss below the direct path's minimum transfer size;
+figures and conditions in [PERFORMANCE.md](PERFORMANCE.md).
+
+## Pairing with gpu-unlock (GA102/GA104)
+
+If you have GA102/GA104 cards,
+[Zagitta/gpu-unlock](https://github.com/Zagitta/gpu-unlock) runs from the
+initramfs before the driver binds and lifts the consumer SM issue-rate caps
+(`SS0`/`SS1`) — the CMP cap on tensor and arithmetic throughput. It does
+not touch clocks, memory bandwidth, BAR1 or the P2P path, and it never
+writes the vBIOS. It is maintained in its own repository and updated
+regularly, so install it directly from there.
+
+## Full requirements
+
+- Linux with NVIDIA **open** kernel modules
+- Kernel headers, `gcc`, `git`, `patch`, `make`
+- Two or more NVIDIA GPUs — the installer selects what applies
+- systemd, OpenRC or dinit
+- Root (to load kernel modules)
+- ~2 GB disk
+
+The installer pins the NVIDIA source tag it was written against
+(615.78.08; see the port section below).
+
 ## The two halves of the driver patch
 
 1. **Peer-BAR1 guard relaxation** (`osmemdesc.c`, `nvrm_registry.h`):
@@ -92,6 +125,9 @@ code runs).
 | `scripts/install.sh` | root | detects the GPUs (`nvidia-smi`) and installs the barlink driver on modded cards (2080 Ti 22 GB, 3080 20 GB, 4080 32 GB, 4090 48 GB) or on uneven rigs after confirmation (uniform stock rigs need `--with-modded-p2p`). Clones NVIDIA's module source at the pinned tag, applies `patches/BARLINK_PCIE-615.78.08.patch` and builds it; clones barlink-pcie, applies the four `patches/barlink-*.patch`, builds `dmabuf_holder`, installs the modules as a persistent override, writes the keys, and activates now. Idempotent — re-run after a kernel upgrade |
 | `scripts/verify.sh` | root | compiles and runs the byte-proof probe (both directions, `bad_bytes` must be 0); checks the loaded module, keys, holder, and optionally runs barlink's own `preflight` |
 | `scripts/revert.sh` | root | removes the override and all config, returns to the stock driver |
+
+`install.sh` asks before installing on an uneven rig; non-interactive runs
+take the prompt defaults (no) unless `--yes` is passed.
 
 Files written by `install.sh`:
 
