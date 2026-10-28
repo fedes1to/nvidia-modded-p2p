@@ -11,13 +11,15 @@ All credit for the mechanism goes upstream: barlink-pcie by **efschu**. This
 repository adds the port to 615.78.08, the platform fixes, and the
 card-aware installer.
 
-## Related, not included
+## Highly recommended!
 
-[Zagitta/gpu-unlock](https://github.com/Zagitta/gpu-unlock) — the GA102/GA104
-SM issue-rate (`SS0`/`SS1`) unlock that this project used to install — is
-maintained in its own repository and updated regularly there, so this
-repository no longer bundles it. Install it from upstream directly if you
-want the compute unlock on top of the patched driver.
+If you have GA102/GA104 cards, pair this with
+[Zagitta/gpu-unlock](https://github.com/Zagitta/gpu-unlock): it runs from
+the initramfs before the driver binds and lifts the consumer SM issue-rate
+caps (`SS0`/`SS1`) — the CMP cap on tensor and arithmetic throughput. It
+does not touch clocks, memory bandwidth, BAR1 or the P2P path, and it never
+writes the vBIOS. It is maintained in its own repository and updated
+regularly, so install it directly from there.
 
 ## Requirements
 
