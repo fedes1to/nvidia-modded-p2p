@@ -38,7 +38,7 @@ the installer builds against: [docs/DETAILS.md](docs/DETAILS.md).
 ## Install
 
 ```bash
-git clone https://git.fedesito.me/fedes1to/nvidia-modded-p2p
+git clone --recurse-submodules https://git.fedesito.me/fedes1to/nvidia-modded-p2p
 cd nvidia-modded-p2p
 sudo bash scripts/install.sh     # detects your cards, installs what applies
 sudo bash scripts/verify.sh      # must print: PASS
@@ -48,7 +48,10 @@ The installer targets modded cards (2080 Ti 22 GB, 3080 20 GB, 4080 32 GB,
 4090 48 GB) and asks before touching an uneven rig (mixed models or
 memory). A uniform stock rig is left alone; pass `--with-modded-p2p` to
 force an install. The change persists across reboots; after a kernel
-upgrade, re-run `install.sh`.
+upgrade, re-run `install.sh`. The `--recurse-submodules` in the clone
+pulls the pinned barlink-pcie tree the build and venvs use; with a plain
+clone, `install.sh` fetches it for you (or falls back to the same
+upstream).
 
 To undo everything:
 
