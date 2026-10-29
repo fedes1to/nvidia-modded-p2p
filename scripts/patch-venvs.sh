@@ -8,7 +8,8 @@
 #   bash scripts/patch-venvs.sh --check             # report, change nothing
 #
 # What it patches:
-#   every venv: the barlink-pcie tree it imports gets the four barlink patches
+#   every venv: the barlink-pcie tree it imports (by default this repo's
+#               vendored submodule) gets the four barlink patches
 #               (platform fixes, inference-mode, capture gate, baton-marker
 #               state; see docs/DETAILS.md). Editable installs are patched in
 #               place; a non-editable barlink is reported, not patched.

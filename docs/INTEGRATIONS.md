@@ -8,6 +8,11 @@ CUDA tensors use the transport ladder including the BAR1 plane, CPU tensors
 stay on gloo). `integrations/python/` is the thin layer that makes frameworks
 choose that backend.
 
+The barlink-pcie tree is vendored as a submodule at `barlink-pcie/` in this
+repo, pinned to the upstream commit that the four `patches/barlink-*.patch`
+apply to; `install.sh` and `patch-venvs.sh` apply those patches to it. No
+separate barlink-pcie checkout is needed.
+
 ## Scope
 
 | Piece | State |
@@ -23,9 +28,10 @@ environment and install the shim plus barlink into that environment.
 ## vLLM
 
 ```bash
+cd /path/to/nvidia-modded-p2p
 python3 -m venv ~/venv-vllm
 ~/venv-vllm/bin/pip install vllm
-~/venv-vllm/bin/pip install -e /path/to/barlink-pcie -e integrations/python
+~/venv-vllm/bin/pip install -e ./barlink-pcie -e ./integrations/python
 sudo bash scripts/patch-venvs.sh ~/venv-vllm   # barlink patches + vLLM custom all-reduce
 
 . /etc/profile.d/barlink-p2p.sh   # BARLINK_* and CUDA_HOME, written by install.sh
@@ -116,9 +122,10 @@ wheels for your interpreter do not exist, pip will try to build them and fail
 — that is upstream packaging, not this project.
 
 ```bash
+cd /path/to/nvidia-modded-p2p
 python3 -m venv ~/venv-sglang
 ~/venv-sglang/bin/pip install sglang
-~/venv-sglang/bin/pip install -e /path/to/barlink-pcie -e integrations/python
+~/venv-sglang/bin/pip install -e ./barlink-pcie -e ./integrations/python
 sudo bash scripts/patch-venvs.sh ~/venv-sglang  # barlink patches
 
 . /etc/profile.d/barlink-p2p.sh

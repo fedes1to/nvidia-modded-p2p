@@ -64,7 +64,9 @@ Both frameworks send tensor-parallel collectives through NCCL, which cannot use
 the direct path. `integrations/python/` makes the process group use barlink's
 transport instead. vLLM additionally has its own P2P custom all-reduce, which
 it disables on more than two PCIe-only GPUs; a patch in `patches/` re-enables
-it on a P2P-capable driver.
+it on a P2P-capable driver. barlink-pcie itself is vendored here as a
+submodule (`barlink-pcie/`, pinned to the commit the platform fixes apply
+to), so no separate checkout is needed.
 
 ### Apply the venv patches
 
@@ -85,9 +87,10 @@ writing.
 vLLM requires a specific PyTorch build, so give it its own environment:
 
 ```bash
+cd /path/to/nvidia-modded-p2p
 python3 -m venv ~/venv-vllm
 ~/venv-vllm/bin/pip install vllm
-~/venv-vllm/bin/pip install -e /path/to/barlink-pcie -e /path/to/nvidia-modded-p2p/integrations/python
+~/venv-vllm/bin/pip install -e ./barlink-pcie -e ./integrations/python
 sudo bash scripts/patch-venvs.sh ~/venv-vllm
 ```
 
@@ -122,9 +125,10 @@ sglang's binary packages are not published for every Python version; use one
 its wheels exist for (see its installation docs).
 
 ```bash
+cd /path/to/nvidia-modded-p2p
 python3 -m venv ~/venv-sglang
 ~/venv-sglang/bin/pip install sglang
-~/venv-sglang/bin/pip install -e /path/to/barlink-pcie -e /path/to/nvidia-modded-p2p/integrations/python
+~/venv-sglang/bin/pip install -e ./barlink-pcie -e ./integrations/python
 sudo bash scripts/patch-venvs.sh ~/venv-sglang
 
 . /etc/profile.d/barlink-p2p.sh

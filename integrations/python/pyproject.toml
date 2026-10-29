@@ -11,7 +11,7 @@ license = { text = "GPL-3.0-only" }
 dependencies = []
 
 [project.optional-dependencies]
-vllm = ["barlink @ git+https://github.com/efschu/barlink-pcie"]
+vllm = ["barlink @ file:../barlink-pcie"]
 
 [project.entry-points."vllm.general_plugins"]
 modded_p2p = "modded_p2p.vllm_plugin:register"

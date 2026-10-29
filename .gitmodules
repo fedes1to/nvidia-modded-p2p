@@ -1,0 +1,3 @@
+[submodule "barlink-pcie"]
+	path = barlink-pcie
+	url = https://github.com/efschu/barlink-pcie

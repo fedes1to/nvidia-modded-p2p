@@ -151,7 +151,10 @@ if [ "$WITH_MODDED_P2P" = 1 ]; then
 
 mkdir -p "$BASE" "$BUILD"
 DRIVER_DIR="$BUILD/driver-$DRIVER_TAG"
-BARLINK_DIR="$BUILD/barlink-pcie"
+# barlink-pcie is vendored as a submodule at the repo root (pinned to the
+# commit the platform fixes apply to); a build-tree clone is only the
+# fallback for checkouts that were made without submodules.
+BARLINK_DIR="$ROOT/barlink-pcie"
 
 step "driver source @ $DRIVER_TAG"
 if [ ! -d "$DRIVER_DIR" ]; then
@@ -176,12 +179,18 @@ M=$(strings kernel-open/nvidia.ko | grep -c BARLINK_PCIE || true)
 echo "BARLINK_PCIE markers: $M (expected 37)"
 [ "$M" = "37" ] || warn "unexpected marker count -- barlink preflight will not report 'full patch'"
 
-step "barlink-pcie library + platform fixes"
-if [ ! -d "$BARLINK_DIR" ]; then
-  git clone --depth 1 "$UPSTREAM_BARLINK" "$BARLINK_DIR"
-else
-  echo "present: $BARLINK_DIR"
+step "barlink-pcie (vendored submodule) + platform fixes"
+if [ -z "$(ls -A "$BARLINK_DIR" 2>/dev/null)" ]; then
+  # plain clone without submodules: try to initialize it, else clone upstream
+  if ! git -C "$ROOT" submodule update --init --depth 1 barlink-pcie >/dev/null 2>&1; then
+    warn "submodule init failed; cloning $UPSTREAM_BARLINK into the build tree"
+    BARLINK_DIR="$BUILD/barlink-pcie"
+    git clone --depth 1 "$UPSTREAM_BARLINK" "$BARLINK_DIR"
+  fi
+elif [ -d "$BUILD/barlink-pcie" ]; then
+  rm -rf "$BUILD/barlink-pcie"   # stale clone from an older installer
 fi
+echo "using: $BARLINK_DIR (@ $(git -C "$BARLINK_DIR" rev-parse --short HEAD 2>/dev/null))"
 cd "$BARLINK_DIR"
 # Apply each patch independently and idempotently. A single combined patch
 # cannot be re-checked after a partial application, and skipping on any dirty
