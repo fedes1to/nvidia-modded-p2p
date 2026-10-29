@@ -183,9 +183,13 @@ step "barlink-pcie (vendored submodule) + platform fixes"
 if [ -z "$(ls -A "$BARLINK_DIR" 2>/dev/null)" ]; then
   # plain clone without submodules: try to initialize it, else clone upstream
   if ! git -C "$ROOT" submodule update --init --depth 1 barlink-pcie >/dev/null 2>&1; then
-    warn "submodule init failed; cloning $UPSTREAM_BARLINK into the build tree"
+    # last resort: clone upstream and check out the same pinned commit
+    # (a shallow HEAD clone can be ahead of the pin, and the patches in
+    # this repo apply to the pinned commit)
+    warn "submodule init failed; cloning $UPSTREAM_BARLINK (pinned commit) into the build tree"
     BARLINK_DIR="$BUILD/barlink-pcie"
-    git clone --depth 1 "$UPSTREAM_BARLINK" "$BARLINK_DIR"
+    git clone "$UPSTREAM_BARLINK" "$BARLINK_DIR"
+    git -C "$BARLINK_DIR" checkout "$(git -C "$ROOT" rev-parse 'barlink-pcie^{commit}' 2>/dev/null || echo HEAD)"
   fi
 elif [ -d "$BUILD/barlink-pcie" ]; then
   rm -rf "$BUILD/barlink-pcie"   # stale clone from an older installer
