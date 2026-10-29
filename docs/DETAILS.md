@@ -125,6 +125,7 @@ code runs).
 | `scripts/install.sh` | root | detects the GPUs (`nvidia-smi`) and installs the barlink driver on modded cards (2080 Ti 22 GB, 3080 20 GB, 4080 32 GB, 4090 48 GB) or on uneven rigs after confirmation (uniform stock rigs need `--with-modded-p2p`). Clones NVIDIA's module source at the pinned tag, applies `patches/BARLINK_PCIE-615.78.08.patch` and builds it; clones barlink-pcie, applies the four `patches/barlink-*.patch`, builds `dmabuf_holder`, installs the modules as a persistent override, writes the keys, and activates now. Idempotent — re-run after a kernel upgrade |
 | `scripts/verify.sh` | root | compiles and runs the byte-proof probe (both directions, `bad_bytes` must be 0); checks the loaded module, keys, holder, and optionally runs barlink's own `preflight` |
 | `scripts/revert.sh` | root | removes the override and all config, returns to the stock driver |
+| `scripts/patch-venvs.sh` | the venv's owner (re-runs itself as `$SUDO_USER` when started with sudo) | applies the four `patches/barlink-*.patch` to the barlink-pcie each venv imports, and `patches/vllm-custom-allreduce-p2p-<version>.patch` to the vLLM venv; idempotent, `--check` reports without writing |
 
 `install.sh` asks before installing on an uneven rig; non-interactive runs
 take the prompt defaults (no) unless `--yes` is passed.
@@ -209,6 +210,8 @@ patches/
   barlink-capture-gate.patch       watchdog poll exclusion around CUDA-graph capture
   barlink-inference-mode.patch     abort-gate watchdog re-enters InferenceMode
   barlink-baton-marker-state.patch JIT build lock: a queued waiter is not a builder
-scripts/ install.sh verify.sh revert.sh
-docs/    DETAILS.md PERFORMANCE.md
+  vllm-custom-allreduce-p2p-0.31.0.patch vLLM: enable the P2P custom all-reduce on >2 PCIe GPUs
+scripts/ install.sh verify.sh revert.sh patch-venvs.sh
+docs/    DETAILS.md PERFORMANCE.md INTEGRATIONS.md
+integrations/python/   vLLM/sglang framework seams (the modded_p2p package)
 ```

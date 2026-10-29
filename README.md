@@ -16,7 +16,7 @@ resizing, no firmware flashing, no proprietary blobs.
 
 All credit for the mechanism goes upstream: barlink-pcie by **efschu**.
 This repository adds the port to the current driver, the platform fixes,
-and the card-aware installer.
+and the card-aware installer, plus the vLLM/sglang framework patches.
 
 ## Also recommended: gpu-unlock
 
@@ -58,9 +58,114 @@ sudo bash scripts/revert.sh
 
 A plain reboot also returns you to the stock driver.
 
+## Framework patches (vLLM, sglang)
+
+Both frameworks send tensor-parallel collectives through NCCL, which cannot use
+the direct path. `integrations/python/` makes the process group use barlink's
+transport instead. vLLM additionally has its own P2P custom all-reduce, which
+it disables on more than two PCIe-only GPUs; a patch in `patches/` re-enables
+it on a P2P-capable driver.
+
+### Apply the venv patches
+
+One command patches both environments (auto-detects `~/venv-vllm` and
+`~/venv-sglang`):
+
+```bash
+sudo bash scripts/patch-venvs.sh
+sudo bash scripts/patch-venvs.sh ~/venv-vllm ~/venv-sglang   # explicit paths
+```
+
+It applies the four barlink patches to the barlink-pcie each venv imports, and
+the vLLM custom all-reduce patch to the vLLM venv. `--check` reports without
+writing.
+
+### vLLM
+
+vLLM requires a specific PyTorch build, so give it its own environment:
+
+```bash
+python3 -m venv ~/venv-vllm
+~/venv-vllm/bin/pip install vllm
+~/venv-vllm/bin/pip install -e /path/to/barlink-pcie -e /path/to/nvidia-modded-p2p/integrations/python
+sudo bash scripts/patch-venvs.sh ~/venv-vllm
+```
+
+Start it (root is required — the driver's P2P path asks for a permission only
+root holds; the first start compiles a kernel once):
+
+```bash
+. /etc/profile.d/barlink-p2p.sh
+export MODDED_P2P_VLLM=1
+export BARLINK_TRANSPORT=bar1
+sudo -E ~/venv-vllm/bin/vllm serve <your-model> \
+    --tensor-parallel-size 2 \
+    --disable-custom-all-reduce
+```
+
+Each worker prints one line at startup when the direct path is active:
+
+```
+modded_p2p: process group created, resolved backend=barlink
+```
+
+Without that line the framework runs its normal path.
+
+Some Python releases are not supported by parts of vLLM's own runtime; if the
+first request hangs with `No available shared memory broadcast block`, that
+issue exists independently of this project — use a Python version the
+framework supports.
+
+### sglang
+
+sglang's binary packages are not published for every Python version; use one
+its wheels exist for (see its installation docs).
+
+```bash
+python3 -m venv ~/venv-sglang
+~/venv-sglang/bin/pip install sglang
+~/venv-sglang/bin/pip install -e /path/to/barlink-pcie -e /path/to/nvidia-modded-p2p/integrations/python
+sudo bash scripts/patch-venvs.sh ~/venv-sglang
+
+. /etc/profile.d/barlink-p2p.sh
+export MODDED_P2P_SGLANG=1
+export BARLINK_TRANSPORT=bar1
+sudo -E ~/venv-sglang/bin/python -m modded_p2p.sglang_launch \
+    --model-path <your-model> --tp 2
+```
+
+The launcher is sglang's own server with the transport selection applied
+first; without the two variables it behaves like plain sglang.
+
+### Verify the direct path without a framework
+
+```bash
+. /etc/profile.d/barlink-p2p.sh
+export BARLINK_TRANSPORT=bar1
+sudo -E python -m torch.distributed.run --nproc_per_node=2 \
+    integrations/python/tests/test_backend_allreduce.py --backend barlink
+```
+
+Expected: `all_reduce ...: OK` per rank and a transport state line reading
+`requested: bar1, achieved: bar1`.
+
+### Operational notes
+
+- Every GPU process must see the same `BARLINK_*` variables. Mismatched values
+  between processes make the job hang rather than print an error.
+- Transfers below the transport's minimum size (4 KiB by default) deliberately
+  use the host-staged path; larger messages are where the direct path pays.
+- Tensor parallelism is covered; pipeline parallelism is not — run PP profiles
+  with the plugin off. See [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
+- Native C++ engines (llama.cpp, Strata) have no `torch.distributed` interface
+  and are out of scope for these integrations.
+
+Details and limits: [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
+
 ## Docs
 
 - [docs/DETAILS.md](docs/DETAILS.md) — how it works, what the patches change, troubleshooting, FAQ
+- [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) — vLLM/sglang integration and limits
 - [docs/PERFORMANCE.md](docs/PERFORMANCE.md) — measured numbers and conditions
 - [LICENSE-NOTES.md](LICENSE-NOTES.md) — licenses
 
